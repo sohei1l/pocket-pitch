@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(RTAUDIO REQUIRED rtaudio)
 
-add_executable(pocket-pitch src/main.cpp src/RingBuffer.cpp src/PitchShifter.cpp)
+add_executable(pocket-pitch src/main.cpp src/RingBuffer.cpp src/PitchShifter.cpp src/SpectralMeter.cpp)
 
 target_link_libraries(pocket-pitch ${RTAUDIO_LIBRARIES})
 target_include_directories(pocket-pitch PRIVATE ${RTAUDIO_INCLUDE_DIRS})

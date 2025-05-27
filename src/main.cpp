@@ -5,22 +5,26 @@
 #include <cstdlib>
 #include "RingBuffer.h"
 #include "PitchShifter.h"
+#include "SpectralMeter.h"
 
 void printUsage(const char* programName) {
     std::cout << "Usage: " << programName << " [options]\n"
               << "Options:\n"
               << "  -s, --semitones <value>   Pitch shift in semitones [-12 to +12] (default: 5)\n"
               << "  -m, --mix <value>         Wet/dry mix [0.0 to 1.0] (default: 1.0)\n"
+              << "  -f, --fft                 Enable spectral meter visualization\n"
               << "  -h, --help                Show this help message\n"
               << "\nExamples:\n"
               << "  " << programName << " -s 7 -m 0.5    # +7 semitones, 50% mix\n"
-              << "  " << programName << " -s -5          # -5 semitones, 100% wet\n";
+              << "  " << programName << " -s -5 -f       # -5 semitones, with FFT display\n";
 }
 
 struct AudioData {
     PitchShifter* pitchShifter;
+    SpectralMeter* spectralMeter;
     unsigned int bufferSize;
     float pitchSemitones;
+    bool enableFFT;
 };
 
 int audioCallback(void* outputBuffer, void* inputBuffer, unsigned int nBufferFrames,
@@ -37,6 +41,13 @@ int audioCallback(void* outputBuffer, void* inputBuffer, unsigned int nBufferFra
     // Process audio through pitch shifter
     if (input && output && data->pitchShifter) {
         data->pitchShifter->processBlock(input, output, nBufferFrames);
+        
+        // Feed output to spectral meter if enabled
+        if (data->enableFFT && data->spectralMeter) {
+            for (unsigned int i = 0; i < nBufferFrames; ++i) {
+                data->spectralMeter->addSample(output[i]);
+            }
+        }
     } else {
         // Fill with silence if no input/output buffers
         if (output) {
@@ -51,6 +62,7 @@ int main(int argc, char* argv[]) {
     // Parse command line arguments
     float semitones = 5.0f;  // Default to +5 semitones
     float mixLevel = 1.0f;   // Default to 100% wet
+    bool enableFFT = false;  // Default to no FFT display
     
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "-s") == 0 || std::strcmp(argv[i], "--semitones") == 0) {
@@ -63,6 +75,8 @@ int main(int argc, char* argv[]) {
                 mixLevel = std::atof(argv[++i]);
                 mixLevel = std::max(0.0f, std::min(1.0f, mixLevel));
             }
+        } else if (std::strcmp(argv[i], "-f") == 0 || std::strcmp(argv[i], "--fft") == 0) {
+            enableFFT = true;
         } else if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
             printUsage(argv[0]);
             return 0;
@@ -96,28 +110,38 @@ int main(int argc, char* argv[]) {
     pitchShifter.setPitchRatio(pitchRatio);
     pitchShifter.setMixLevel(mixLevel);
     
+    // Create spectral meter if FFT is enabled
+    SpectralMeter* spectralMeter = nullptr;
+    if (enableFFT) {
+        spectralMeter = new SpectralMeter(1024);
+    }
+    
     AudioData data;
     data.pitchShifter = &pitchShifter;
+    data.spectralMeter = spectralMeter;
     data.bufferSize = bufferFrames;
     data.pitchSemitones = semitones;
+    data.enableFFT = enableFFT;
     
     try {
         audio.openStream(&outputParams, &inputParams, RTAUDIO_FLOAT32,
                         sampleRate, &bufferFrames, &audioCallback, &data);
         audio.startStream();
         
-        std::cout << "Pocket Pitch - Granular pitch shifter with anti-aliasing" << std::endl;
-        std::cout << "Sample Rate: " << sampleRate << " Hz" << std::endl;
-        std::cout << "Buffer Size: " << bufferFrames << " samples" << std::endl;
-        
-        if (semitones >= 0) {
-            std::cout << "Pitch Shift: +" << semitones << " semitones";
-        } else {
-            std::cout << "Pitch Shift: " << semitones << " semitones";
+        if (!enableFFT) {
+            std::cout << "Pocket Pitch - Granular pitch shifter with anti-aliasing" << std::endl;
+            std::cout << "Sample Rate: " << sampleRate << " Hz" << std::endl;
+            std::cout << "Buffer Size: " << bufferFrames << " samples" << std::endl;
+            
+            if (semitones >= 0) {
+                std::cout << "Pitch Shift: +" << semitones << " semitones";
+            } else {
+                std::cout << "Pitch Shift: " << semitones << " semitones";
+            }
+            std::cout << " (ratio: " << pitchRatio << ")" << std::endl;
+            std::cout << "Mix Level: " << (mixLevel * 100.0f) << "% wet" << std::endl;
+            std::cout << "Press Enter to quit..." << std::endl;
         }
-        std::cout << " (ratio: " << pitchRatio << ")" << std::endl;
-        std::cout << "Mix Level: " << (mixLevel * 100.0f) << "% wet" << std::endl;
-        std::cout << "Press Enter to quit..." << std::endl;
         
         std::cin.get();
         
@@ -129,6 +153,11 @@ int main(int argc, char* argv[]) {
     
     if (audio.isStreamOpen()) {
         audio.closeStream();
+    }
+    
+    // Clean up spectral meter
+    if (spectralMeter) {
+        delete spectralMeter;
     }
     
     return 0;
