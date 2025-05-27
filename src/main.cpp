@@ -1,11 +1,14 @@
 #include <iostream>
 #include <RtAudio.h>
 #include <cstring>
+#include <cmath>
 #include "RingBuffer.h"
+#include "PitchShifter.h"
 
 struct AudioData {
-    RingBuffer* ringBuffer;
+    PitchShifter* pitchShifter;
     unsigned int bufferSize;
+    float pitchSemitones;
 };
 
 int audioCallback(void* outputBuffer, void* inputBuffer, unsigned int nBufferFrames,
@@ -19,17 +22,14 @@ int audioCallback(void* outputBuffer, void* inputBuffer, unsigned int nBufferFra
     float* input = static_cast<float*>(inputBuffer);
     float* output = static_cast<float*>(outputBuffer);
     
-    // Write input to ring buffer
-    if (input && data->ringBuffer) {
-        data->ringBuffer->write(input, nBufferFrames);
-    }
-    
-    // Read from ring buffer to output (zero-latency echo)
-    if (output && data->ringBuffer) {
-        data->ringBuffer->read(output, nBufferFrames);
+    // Process audio through pitch shifter
+    if (input && output && data->pitchShifter) {
+        data->pitchShifter->processBlock(input, output, nBufferFrames);
     } else {
-        // Fill with silence if no output buffer
-        std::memset(output, 0, nBufferFrames * sizeof(float));
+        // Fill with silence if no input/output buffers
+        if (output) {
+            std::memset(output, 0, nBufferFrames * sizeof(float));
+        }
     }
     
     return 0;
@@ -55,22 +55,28 @@ int main() {
     unsigned int sampleRate = 44100;
     unsigned int bufferFrames = 256;
     
-    // Create ring buffer (2x buffer size for decoupling)
-    RingBuffer ringBuffer(bufferFrames * 2);
+    // Create pitch shifter
+    PitchShifter pitchShifter(bufferFrames, static_cast<float>(sampleRate));
+    
+    // Default to +5 semitones (perfect fourth up)
+    float semitones = 5.0f;
+    float pitchRatio = std::pow(2.0f, semitones / 12.0f);
+    pitchShifter.setPitchRatio(pitchRatio);
     
     AudioData data;
-    data.ringBuffer = &ringBuffer;
+    data.pitchShifter = &pitchShifter;
     data.bufferSize = bufferFrames;
+    data.pitchSemitones = semitones;
     
     try {
         audio.openStream(&outputParams, &inputParams, RTAUDIO_FLOAT32,
                         sampleRate, &bufferFrames, &audioCallback, &data);
         audio.startStream();
         
-        std::cout << "Pocket Pitch - Ring buffer echo active" << std::endl;
+        std::cout << "Pocket Pitch - Granular pitch shifter active" << std::endl;
         std::cout << "Sample Rate: " << sampleRate << " Hz" << std::endl;
         std::cout << "Buffer Size: " << bufferFrames << " samples" << std::endl;
-        std::cout << "Ring Buffer Size: " << ringBuffer.getSize() << " samples" << std::endl;
+        std::cout << "Pitch Shift: +" << semitones << " semitones (ratio: " << pitchRatio << ")" << std::endl;
         std::cout << "Press Enter to quit..." << std::endl;
         
         std::cin.get();
