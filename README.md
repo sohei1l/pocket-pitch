@@ -21,7 +21,10 @@ make
 
 ## Running
 ```bash
-./pocket-pitch
+./pocket-pitch                    # Default: +5 semitones, 100% wet
+./pocket-pitch -s 7 -m 0.5        # +7 semitones, 50% mix
+./pocket-pitch -s -3 -m 0.8       # -3 semitones, 80% wet
+./pocket-pitch --help             # Show usage
 ```
 
 ## Milestones
@@ -29,5 +32,5 @@ make
 - [x] **Milestone 1**: I/O Loop - CMake skeleton + single .cpp. Use RtAudio for duplex stream; pass-through audio untouched.
 - [x] **Milestone 2**: Ring Buffer - Implement lock-free circular buffer (2× block size) to decouple callback timing; verify zero-latency echo.
 - [x] **Milestone 3**: Granular Shift - Add two cross-fading read heads that glide through the buffer at rate = pitchRatio. Linear-interp resampling gives ±1 octave without FFT.
-- [ ] **Milestone 4**: Anti-Aliasing & Wet/Dry - Insert simple FIR low-pass on each grain, expose mix and semitones CLI flags.
+- [x] **Milestone 4**: Anti-Aliasing & Wet/Dry - Insert simple FIR low-pass on each grain, expose mix and semitones CLI flags.
 - [ ] **Milestone 5**: Spectral Meter (Bonus) - Pipe a 1024-point FFT via KISS FFT every 50 ms and print an ASCII bar graph so you can "see" the shift.

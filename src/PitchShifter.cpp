@@ -6,6 +6,7 @@ PitchShifter::PitchShifter(size_t bufferSize, float sampleRate)
     : sampleRate_(sampleRate)
     , bufferSize_(bufferSize)
     , pitchRatio_(1.0f)
+    , mixLevel_(1.0f)  // Default to 100% wet
     , grainSize_(1024.0f)
     , readHead1_(0.0f)
     , readHead2_(0.0f)
@@ -17,6 +18,13 @@ PitchShifter::PitchShifter(size_t bufferSize, float sampleRate)
     
     // Create a larger buffer for pitch shifting (4x size for good margin)
     buffer_ = new RingBuffer(bufferSize * 4);
+    
+    // Initialize lowpass filter (simple 3-tap FIR)
+    filterHistory_[0] = filterHistory_[1] = filterHistory_[2] = 0.0f;
+    // Normalized coefficients for simple averaging filter
+    filterCoeffs_[0] = 0.25f;
+    filterCoeffs_[1] = 0.5f;
+    filterCoeffs_[2] = 0.25f;
 }
 
 PitchShifter::~PitchShifter() {
@@ -28,6 +36,10 @@ void PitchShifter::setPitchRatio(float ratio) {
     pitchRatio_ = std::max(0.5f, std::min(2.0f, ratio));
 }
 
+void PitchShifter::setMixLevel(float mix) {
+    mixLevel_ = std::max(0.0f, std::min(1.0f, mix));
+}
+
 float PitchShifter::linearInterpolate(float a, float b, float fraction) {
     return a + fraction * (b - a);
 }
@@ -36,6 +48,18 @@ float PitchShifter::getGrainWindow(float phase) {
     // Simple Hann window
     if (phase < 0.0f || phase > 1.0f) return 0.0f;
     return 0.5f * (1.0f - std::cos(2.0f * M_PI * phase));
+}
+
+float PitchShifter::applyLowpassFilter(float input) {
+    // Shift history
+    filterHistory_[2] = filterHistory_[1];
+    filterHistory_[1] = filterHistory_[0];
+    filterHistory_[0] = input;
+    
+    // Apply FIR filter
+    return filterCoeffs_[0] * filterHistory_[0] + 
+           filterCoeffs_[1] * filterHistory_[1] + 
+           filterCoeffs_[2] * filterHistory_[2];
 }
 
 void PitchShifter::processBlock(const float* input, float* output, size_t numSamples) {
@@ -86,8 +110,11 @@ void PitchShifter::processBlock(const float* input, float* output, size_t numSam
             }
         }
         
-        // Cross-fade between grains
-        output[i] = sample1 + sample2;
+        // Cross-fade between grains and apply anti-aliasing filter
+        float wetSample = applyLowpassFilter(sample1 + sample2);
+        
+        // Mix dry and wet signals
+        output[i] = (1.0f - mixLevel_) * input[i] + mixLevel_ * wetSample;
         
         // Update grain phases
         grainPhase1_ += 1.0f / grainSize_;
