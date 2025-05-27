@@ -21,18 +21,20 @@ make
 
 ## Running
 ```bash
-./pocket-pitch                    # Default: +5 semitones, 100% wet
-./pocket-pitch -s 7 -m 0.5        # +7 semitones, 50% mix
-./pocket-pitch -s -3 -m 0.8       # -3 semitones, 80% wet
-./pocket-pitch -f                 # Enable real-time FFT spectral meter
-./pocket-pitch -s 5 -f            # +5 semitones with spectral visualization
-./pocket-pitch --help             # Show usage
+./pocket-pitch                         # Default: +5 semitones, 100% wet, unity gain
+./pocket-pitch -s 7 -m 0.5 -g 1.5      # +7 semitones, 50% mix, +3dB gain
+./pocket-pitch -s -3 -m 0.8 -g 0.7     # -3 semitones, 80% wet, -3dB gain
+./pocket-pitch -f                      # Enable real-time FFT spectral meter
+./pocket-pitch -s 5 -f -g 1.2          # +5 semitones with spectral visualization
+./pocket-pitch --help                  # Show usage
 ```
 
-## Milestones
+## Features
 
-- [x] **Milestone 1**: I/O Loop - CMake skeleton + single .cpp. Use RtAudio for duplex stream; pass-through audio untouched.
-- [x] **Milestone 2**: Ring Buffer - Implement lock-free circular buffer (2× block size) to decouple callback timing; verify zero-latency echo.
-- [x] **Milestone 3**: Granular Shift - Add two cross-fading read heads that glide through the buffer at rate = pitchRatio. Linear-interp resampling gives ±1 octave without FFT.
-- [x] **Milestone 4**: Anti-Aliasing & Wet/Dry - Insert simple FIR low-pass on each grain, expose mix and semitones CLI flags.
-- [x] **Milestone 5**: Spectral Meter (Bonus) - Pipe a 1024-point FFT via KISS FFT every 50 ms and print an ASCII bar graph so you can "see" the shift.
+- Real-time granular pitch shifting (±12 semitones)
+- Lock-free audio processing for minimal latency
+- Anti-aliasing filter to reduce artifacts
+- Wet/dry mix control
+- Output gain control (0.1x to 2.0x)
+- Live FFT spectral visualization
+- Cross-platform terminal interface

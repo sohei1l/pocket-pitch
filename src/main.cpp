@@ -12,11 +12,12 @@ void printUsage(const char* programName) {
               << "Options:\n"
               << "  -s, --semitones <value>   Pitch shift in semitones [-12 to +12] (default: 5)\n"
               << "  -m, --mix <value>         Wet/dry mix [0.0 to 1.0] (default: 1.0)\n"
+              << "  -g, --gain <value>        Output gain [0.1 to 2.0] (default: 1.0)\n"
               << "  -f, --fft                 Enable spectral meter visualization\n"
               << "  -h, --help                Show this help message\n"
               << "\nExamples:\n"
-              << "  " << programName << " -s 7 -m 0.5    # +7 semitones, 50% mix\n"
-              << "  " << programName << " -s -5 -f       # -5 semitones, with FFT display\n";
+              << "  " << programName << " -s 7 -m 0.5 -g 1.5  # +7 semitones, 50% mix, +3dB gain\n"
+              << "  " << programName << " -s -5 -f -g 0.7     # -5 semitones, FFT display, -3dB gain\n";
 }
 
 struct AudioData {
@@ -24,6 +25,7 @@ struct AudioData {
     SpectralMeter* spectralMeter;
     unsigned int bufferSize;
     float pitchSemitones;
+    float outputGain;
     bool enableFFT;
 };
 
@@ -41,6 +43,11 @@ int audioCallback(void* outputBuffer, void* inputBuffer, unsigned int nBufferFra
     // Process audio through pitch shifter
     if (input && output && data->pitchShifter) {
         data->pitchShifter->processBlock(input, output, nBufferFrames);
+        
+        // Apply output gain
+        for (unsigned int i = 0; i < nBufferFrames; ++i) {
+            output[i] *= data->outputGain;
+        }
         
         // Feed output to spectral meter if enabled
         if (data->enableFFT && data->spectralMeter) {
@@ -62,6 +69,7 @@ int main(int argc, char* argv[]) {
     // Parse command line arguments
     float semitones = 5.0f;  // Default to +5 semitones
     float mixLevel = 1.0f;   // Default to 100% wet
+    float outputGain = 1.0f; // Default to unity gain
     bool enableFFT = false;  // Default to no FFT display
     
     for (int i = 1; i < argc; ++i) {
@@ -74,6 +82,11 @@ int main(int argc, char* argv[]) {
             if (i + 1 < argc) {
                 mixLevel = std::atof(argv[++i]);
                 mixLevel = std::max(0.0f, std::min(1.0f, mixLevel));
+            }
+        } else if (std::strcmp(argv[i], "-g") == 0 || std::strcmp(argv[i], "--gain") == 0) {
+            if (i + 1 < argc) {
+                outputGain = std::atof(argv[++i]);
+                outputGain = std::max(0.1f, std::min(2.0f, outputGain));
             }
         } else if (std::strcmp(argv[i], "-f") == 0 || std::strcmp(argv[i], "--fft") == 0) {
             enableFFT = true;
@@ -121,6 +134,7 @@ int main(int argc, char* argv[]) {
     data.spectralMeter = spectralMeter;
     data.bufferSize = bufferFrames;
     data.pitchSemitones = semitones;
+    data.outputGain = outputGain;
     data.enableFFT = enableFFT;
     
     try {
@@ -140,6 +154,7 @@ int main(int argc, char* argv[]) {
             }
             std::cout << " (ratio: " << pitchRatio << ")" << std::endl;
             std::cout << "Mix Level: " << (mixLevel * 100.0f) << "% wet" << std::endl;
+            std::cout << "Output Gain: " << outputGain << "x (" << (20.0f * std::log10(outputGain)) << " dB)" << std::endl;
             std::cout << "Press Enter to quit..." << std::endl;
         }
         
