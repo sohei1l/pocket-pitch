@@ -1,10 +1,10 @@
 #include <iostream>
 #include <RtAudio.h>
 #include <cstring>
+#include "RingBuffer.h"
 
 struct AudioData {
-    float* inputBuffer;
-    float* outputBuffer;
+    RingBuffer* ringBuffer;
     unsigned int bufferSize;
 };
 
@@ -15,14 +15,20 @@ int audioCallback(void* outputBuffer, void* inputBuffer, unsigned int nBufferFra
         std::cerr << "Stream underflow/overflow detected!" << std::endl;
     }
     
+    AudioData* data = static_cast<AudioData*>(userData);
     float* input = static_cast<float*>(inputBuffer);
     float* output = static_cast<float*>(outputBuffer);
     
-    // Simple pass-through: copy input to output
-    if (input && output) {
-        std::memcpy(output, input, nBufferFrames * sizeof(float));
+    // Write input to ring buffer
+    if (input && data->ringBuffer) {
+        data->ringBuffer->write(input, nBufferFrames);
+    }
+    
+    // Read from ring buffer to output (zero-latency echo)
+    if (output && data->ringBuffer) {
+        data->ringBuffer->read(output, nBufferFrames);
     } else {
-        // Fill with silence if no input
+        // Fill with silence if no output buffer
         std::memset(output, 0, nBufferFrames * sizeof(float));
     }
     
@@ -49,7 +55,11 @@ int main() {
     unsigned int sampleRate = 44100;
     unsigned int bufferFrames = 256;
     
+    // Create ring buffer (2x buffer size for decoupling)
+    RingBuffer ringBuffer(bufferFrames * 2);
+    
     AudioData data;
+    data.ringBuffer = &ringBuffer;
     data.bufferSize = bufferFrames;
     
     try {
@@ -57,9 +67,10 @@ int main() {
                         sampleRate, &bufferFrames, &audioCallback, &data);
         audio.startStream();
         
-        std::cout << "Pocket Pitch - Audio pass-through active" << std::endl;
+        std::cout << "Pocket Pitch - Ring buffer echo active" << std::endl;
         std::cout << "Sample Rate: " << sampleRate << " Hz" << std::endl;
         std::cout << "Buffer Size: " << bufferFrames << " samples" << std::endl;
+        std::cout << "Ring Buffer Size: " << ringBuffer.getSize() << " samples" << std::endl;
         std::cout << "Press Enter to quit..." << std::endl;
         
         std::cin.get();
