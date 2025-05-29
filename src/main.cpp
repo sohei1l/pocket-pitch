@@ -7,6 +7,8 @@
 #include "PitchShifter.h"
 #include "SpectralMeter.h"
 
+#define POCKET_PITCH_VERSION "1.0.0"
+
 void printUsage(const char* programName) {
     std::cout << "Usage: " << programName << " [options]\n"
               << "Options:\n"
@@ -15,6 +17,7 @@ void printUsage(const char* programName) {
               << "  -g, --gain <value>        Output gain [0.1 to 2.0] (default: 1.0)\n"
               << "  -p, --preset <name>       Use preset (octave-up, octave-down, fifth-up, chipmunk, deep)\n"
               << "  -f, --fft                 Enable spectral meter visualization\n"
+              << "  -v, --version             Show version information\n"
               << "  -h, --help                Show this help message\n"
               << "\nPresets:\n"
               << "  octave-up    +12 semitones (double pitch)\n"
@@ -122,6 +125,10 @@ int main(int argc, char* argv[]) {
             }
         } else if (std::strcmp(argv[i], "-f") == 0 || std::strcmp(argv[i], "--fft") == 0) {
             enableFFT = true;
+        } else if (std::strcmp(argv[i], "-v") == 0 || std::strcmp(argv[i], "--version") == 0) {
+            std::cout << "Pocket Pitch v" << POCKET_PITCH_VERSION << std::endl;
+            std::cout << "Real-time granular pitch shifter with anti-aliasing" << std::endl;
+            return 0;
         } else if (std::strcmp(argv[i], "-h") == 0 || std::strcmp(argv[i], "--help") == 0) {
             printUsage(argv[0]);
             return 0;

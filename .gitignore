@@ -11,5 +11,20 @@ CMakeFiles/
 cmake_install.cmake
 Makefile
 
+# IDE files
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.temp
+
+# Debugging files
+*.dSYM/
+core
+*.core
+
 # Project documentation for future development
 CLAUDE.md
